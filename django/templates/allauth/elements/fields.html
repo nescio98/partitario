@@ -1,0 +1,42 @@
+{% load account_ui %}
+{% comment %} A whole form, field by field, with Unfold's widgets classes. {% endcomment %}
+{% if attrs.form.non_field_errors %}
+    <div class="bg-red-100 leading-[18px] mb-4 px-3 py-2.5 rounded-default text-red-700 dark:bg-red-500/20 dark:text-red-400">
+        {% for error in attrs.form.non_field_errors %}<p>{{ error }}</p>{% endfor %}
+    </div>
+{% endif %}
+{% for field in attrs.form %}
+    {% if field.is_hidden %}
+        {{ field }}
+    {% elif field.widget_type == "checkbox" %}
+        <div class="group mb-4{% if field.errors %} errors{% endif %}">
+            <div class="flex flex-row gap-2 items-center">
+                {{ field|styled }}
+                <label for="{{ field.id_for_label }}">{{ field.label }}</label>
+            </div>
+            {% if field.errors %}
+                <ul class="mt-1 text-red-600 text-xs dark:text-red-500">
+                    {% for error in field.errors %}<li>{{ error }}</li>{% endfor %}
+                </ul>
+            {% endif %}
+        </div>
+    {% else %}
+        <div class="group mb-4{% if field.errors %} errors{% endif %}">
+            <div class="flex flex-col gap-2">
+                <label for="{{ field.id_for_label }}"
+                       class="block font-semibold text-font-important-light dark:text-font-important-dark">{{ field.label }}</label>
+                {{ field|styled }}
+            </div>
+            {% if field.errors %}
+                <ul class="mt-1 text-red-600 text-xs dark:text-red-500">
+                    {% for error in field.errors %}<li>{{ error }}</li>{% endfor %}
+                </ul>
+            {% endif %}
+            {% if field.help_text %}
+                <div class="leading-relaxed mt-2 text-xs [&_a]:text-primary-600 [&_a]:hover:underline dark:[&_a]:text-primary-500">
+                    {{ field.help_text|safe }}
+                </div>
+            {% endif %}
+        </div>
+    {% endif %}
+{% endfor %}

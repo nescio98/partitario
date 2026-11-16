@@ -1,0 +1,6 @@
+{% load allauth %}
+<span class="bg-base-100 font-medium px-2 py-0.5 rounded-default text-xs dark:bg-base-800"
+      {% if attrs.title %}title="{{ attrs.title }}"{% endif %}>
+    {% slot %}
+    {% endslot %}
+</span>

@@ -1,0 +1,18 @@
+# Build the self-hosted images from this repository instead of pulling them.
+# Merged on top of compose.selfhost.yaml by the Makefile when the env file has
+# no PARTITARIO_VERSION, and by the smoke test (tests/smoke/smoke.sh).
+
+services:
+  web:
+    build:
+      context: ../django
+      dockerfile: ../docker/Dockerfile
+      target: production
+
+  nginx:
+    build:
+      context: ../django
+      dockerfile: ../docker/Dockerfile
+      target: nginx
+      additional_contexts:
+        docker: .

@@ -1,0 +1,6 @@
+{% load allauth %}
+<td class="align-top border-b border-base-200 break-words max-w-40 pr-3 py-2 dark:border-base-800"
+    {% if attrs.align %}align="{{ attrs.align }}"{% endif %}>
+    {% slot %}
+    {% endslot %}
+</td>

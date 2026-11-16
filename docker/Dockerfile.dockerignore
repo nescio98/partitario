@@ -1,0 +1,32 @@
+# Applies to the build context (../django). BuildKit reads this file because it
+# sits next to the Dockerfile and shares its name.
+#
+# Patterns are anchored to the context root: `**/` is needed to match at any
+# depth. Nothing produced on the host may reach the image - it builds its own
+# bytecode-free tree, CSS, translations and static files.
+
+# Dependencies and build output
+.venv
+node_modules
+staticfiles
+static/css/app.css
+**/*.mo
+
+# Uploaded documents of a local DJANGO_STORAGE_BACKEND=filesystem run: real data
+media
+
+# Python and tool caches
+**/__pycache__
+**/*.py[cod]
+.pytest_cache
+.ruff_cache
+.mypy_cache
+.import_linter_cache
+.coverage
+.coverage.*
+htmlcov
+
+# Host noise
+.python-version
+**/*.log
+**/.DS_Store

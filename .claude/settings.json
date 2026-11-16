@@ -1,0 +1,6 @@
+{
+  "enabledPlugins": {
+    "impeccable@impeccable": true,
+    "astral@astral-sh": true
+  }
+}

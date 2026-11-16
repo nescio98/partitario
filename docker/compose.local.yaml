@@ -1,0 +1,52 @@
+# Local: the interface on this machine, the data in the cloud. For someone who
+# uses the application alone: no server to run, a HOSTED Supabase project holds
+# the database and the files.
+#
+#   make local-env        # create .env.local from .env.hosted.example, then fill it in
+#   make local-push       # first time: role, schema and bucket on the project
+#   make local-migrate    # first time, and after every update: the tables
+#   make local-superuser  # first time: your login
+#   make local-up         # -> http://localhost:8003/admin/ (LOCAL_PORT in .env.local)
+#
+# This is not the development environment (that is `make worktree-up`, on the
+# local Supabase stack): .env.local points at real data. Migrations are
+# therefore never applied on start, only by `make local-migrate`.
+#
+# Django's own server with DEBUG on, plain HTTP, published on 127.0.0.1 only
+# and without nginx: fine for one person on their own machine, never to be
+# exposed to a network. To serve other people use the self-hosted stack.
+# Paths are relative to this file.
+
+name: partitario-local
+
+services:
+  web:
+    build:
+      context: ../django
+      dockerfile: ../docker/Dockerfile
+    command: python manage.py runserver 0.0.0.0:8000
+    env_file: ../.env.local
+    # Override the hosted values of the env file: this runs on loopback, over HTTP.
+    environment:
+      ENV: "local"
+      DJANGO_DEBUG: "True"
+      DJANGO_ALLOWED_HOSTS: "localhost 127.0.0.1"
+      DJANGO_CSRF_TRUSTED_ORIGINS: ""
+      # One person on their own machine: no bot to keep out of the signup form.
+      TURNSTILE_ENABLED: "False"
+    ports:
+      # LOCAL_PORT of .env.local, for a machine where 8003 is taken.
+      - "127.0.0.1:${LOCAL_PORT:-8003}:8000"
+    develop:
+      watch:
+        - action: sync
+          path: ../django
+          target: /home/app/web
+          ignore:
+            - .venv/
+            - node_modules/
+            - staticfiles/
+        - action: rebuild
+          path: ../django/uv.lock
+        - action: rebuild
+          path: ../django/tailwind/app.css

@@ -1,0 +1,91 @@
+# The development server: Django in a container, against the LOCAL Supabase
+# project of this worktree.
+#
+#   make worktree-up     # Supabase (database + storage), its ports into .env, then
+#                        # docker compose -p <instance> -f docker/compose.dev.yaml up --build --detach --wait
+#   make worktree-logs   # follow the server log (mail is printed there)
+#   make worktree-down   # remove these containers and stop Supabase
+#
+# Two containers: Django's dev server and the Tailwind watcher, which rewrites
+# the stylesheet whenever a template, a Python file or tailwind/app.css
+# changes. Nothing runs on the host - see docs/worktrees.md.
+#
+# The source folders of the worktree are MOUNTED into the containers, read
+# only: what runs is always what is on disk, with no process copying files
+# across, so the stack runs detached and `make worktree-up` returns once the
+# server answers. Everything else comes from the image and changes only when
+# it is rebuilt (`make worktree-up` again): dependencies (uv.lock,
+# package-lock.json) and compiled translations (locale/).
+#
+# Paths are relative to this file. Configuration comes from the repo-root .env;
+# the values below only override what differs inside a container.
+#
+# No `name:` here: the compose project is the instance of the worktree
+# (`make worktree-info`), passed with -p, so that every worktree has its own
+# containers, images and volume.
+
+services:
+  web-dev:
+    build:
+      context: ../django
+      dockerfile: ../docker/Dockerfile
+    command: >
+      sh -c "python manage.py migrate --noinput &&
+             python manage.py ensure_superuser &&
+             python manage.py runserver 127.0.0.1:$${DJANGO_DEV_PORT:-8000}"
+    # Host networking: the container reaches the Supabase CLI stack on
+    # 127.0.0.1 exactly like a process on the host, so the same .env works and
+    # signed storage URLs stay valid in the browser. Bound to loopback: with
+    # host networking 0.0.0.0 would put a DEBUG server with the default admin
+    # password on the local network. Served on the port of the
+    # worktree: DJANGO_DEV_PORT of .env (written by `make env`), read by the
+    # shell inside the container.
+    network_mode: host
+    env_file: ../.env
+    environment:
+      ENV: "dev"
+      DJANGO_DEBUG: "True"
+      DJANGO_ALLOWED_HOSTS: "localhost 127.0.0.1"
+    # Source folders only, never the whole of django/: its .venv belongs to
+    # the host and would hide the one of the image. The stylesheet comes from
+    # the watcher below (static/css/.gitkeep keeps that mount point in every
+    # checkout, so Docker never creates it as root).
+    volumes:
+      - ../django/manage.py:/home/app/web/manage.py:ro
+      - ../django/config:/home/app/web/config:ro
+      - ../django/apps:/home/app/web/apps:ro
+      - ../django/templates:/home/app/web/templates:ro
+      - ../django/static:/home/app/web/static:ro
+      - css:/home/app/web/static/css:ro
+    # `up --wait` returns when this passes, and fails if the server dies first.
+    healthcheck:
+      test:
+        - CMD
+        - python
+        - -c
+        - "import os, urllib.request; urllib.request.urlopen('http://127.0.0.1:%s/healthz' % (os.environ.get('DJANGO_DEV_PORT') or '8000'), timeout=3)"
+      interval: 2s
+      timeout: 5s
+      retries: 90
+      start_period: 5s
+
+  # Tailwind in watch mode, from the stage of the Dockerfile that builds the
+  # stylesheet of the real image: no Node.js on the host. It scans the mounted
+  # templates and Python files and writes static/css/app.css into the volume
+  # the dev server reads.
+  css-dev:
+    build:
+      context: ../django
+      dockerfile: ../docker/Dockerfile
+      target: css-builder
+    # =always: keep watching without a terminal attached.
+    command: npx tailwindcss -i ./tailwind/app.css -o ./static/css/app.css --watch=always
+    volumes:
+      - ../django/tailwind:/css/tailwind:ro
+      - ../django/templates:/css/templates:ro
+      - ../django/apps:/css/apps:ro
+      - css:/css/static/css
+
+# Per compose project, so per worktree; removed by `make worktree-destroy`.
+volumes:
+  css:

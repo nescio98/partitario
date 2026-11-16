@@ -1,0 +1,310 @@
+# Italian translation of partitario.
+# Source strings are English: `make messages` extracts them into this file,
+# `make compilemessages` compiles it (the .mo is not committed).
+msgid ""
+msgstr ""
+"Project-Id-Version: partitario\n"
+"Report-Msgid-Bugs-To: \n"
+"POT-Creation-Date: 2026-11-16 03:07+0100\n"
+"Language: it\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"Plural-Forms: nplurals=2; plural=(n != 1);\n"
+
+#: apps/accounts/admin.py
+msgid "Permissions"
+msgstr "Permessi"
+
+#: apps/accounts/admin.py
+msgid "Important dates"
+msgstr "Date importanti"
+
+#: apps/accounts/admin.py
+msgid "Two-factor"
+msgstr "Due fattori"
+
+#: apps/accounts/admin.py
+msgid "Reset two-factor authentication"
+msgstr "Azzera l'autenticazione a due fattori"
+
+#: apps/accounts/admin.py
+#, python-format
+msgid "Two-factor authentication reset for %(count)d user."
+msgid_plural "Two-factor authentication reset for %(count)d users."
+msgstr[0] "Autenticazione a due fattori azzerata per %(count)d utente."
+msgstr[1] "Autenticazione a due fattori azzerata per %(count)d utenti."
+
+#: apps/accounts/apps.py config/settings.py templates/account/manage.html
+#: templates/allauth/layouts/base.html
+msgid "Account"
+msgstr "Account"
+
+#: apps/accounts/forms.py
+msgid "Verification"
+msgstr "Verifica"
+
+#: apps/accounts/middleware.py
+msgid "Set up two-factor authentication to continue: it is required."
+msgstr ""
+"Per continuare configura l'autenticazione a due fattori: è obbligatoria."
+
+#: apps/accounts/models.py
+msgid "email address"
+msgstr "indirizzo email"
+
+#: apps/accounts/models.py
+msgid "A user with this email address already exists."
+msgstr "Esiste già un utente con questo indirizzo email."
+
+#: apps/accounts/models.py
+msgid "staff status"
+msgstr "privilegi di staff"
+
+#: apps/accounts/models.py
+msgid "Designates whether the user can log into this admin site."
+msgstr "Indica se l'utente può accedere a questo sito di amministrazione."
+
+#: apps/accounts/models.py
+msgid "active"
+msgstr "attivo"
+
+#: apps/accounts/models.py
+msgid ""
+"Designates whether this user should be treated as active. Unselect this "
+"instead of deleting accounts."
+msgstr ""
+"Indica se l'utente deve essere considerato attivo. Deseleziona qui invece di "
+"eliminare gli account."
+
+#: apps/accounts/models.py
+msgid "date joined"
+msgstr "data di iscrizione"
+
+#: apps/accounts/models.py
+msgid "user"
+msgstr "utente"
+
+#: apps/accounts/models.py
+msgid "users"
+msgstr "utenti"
+
+#: apps/accounts/models.py
+msgid "The email address must be lowercase."
+msgstr "L'indirizzo email deve essere in minuscolo."
+
+#: apps/accounts/third_party_messages.py
+#, python-format
+msgid "You are currently working on behalf of <em>%(user)s</em>."
+msgstr "Stai operando come <em>%(user)s</em>."
+
+#: apps/accounts/third_party_messages.py
+msgid "stop impersonating"
+msgstr "smetti di impersonare"
+
+#: apps/accounts/third_party_messages.py
+msgid "hide warning"
+msgstr "nascondi avviso"
+
+#: apps/accounts/third_party_messages.py
+#, python-format
+msgid "impersonate %(username)s"
+msgstr "impersona %(username)s"
+
+#: apps/accounts/third_party_messages.py
+msgctxt "verb"
+msgid "impersonate"
+msgstr "impersona"
+
+#: apps/accounts/turnstile.py
+msgid "Confirm that you are not a robot."
+msgstr "Conferma di non essere un robot."
+
+#: apps/accounts/turnstile.py
+msgid "The verification failed. Try again."
+msgstr "La verifica non è riuscita. Riprova."
+
+#: apps/accounts/views.py
+msgid "Your account was deleted."
+msgstr "Il tuo account è stato eliminato."
+
+#: apps/core/models.py
+msgid "maintenance mode"
+msgstr "modalità manutenzione"
+
+#: apps/core/models.py
+msgid ""
+"While on, visitors get a maintenance page (HTTP 503). Staff and the admin "
+"site keep working."
+msgstr ""
+"Quando è attiva, i visitatori vedono una pagina di manutenzione (HTTP 503). "
+"Lo staff e il pannello di amministrazione continuano a funzionare."
+
+#: apps/core/models.py
+msgid "last change"
+msgstr "ultima modifica"
+
+#: apps/core/models.py
+msgid "On"
+msgstr "Attiva"
+
+#: apps/core/models.py
+msgid "Off"
+msgstr "Disattivata"
+
+#: config/settings.py
+msgid "Italian"
+msgstr "Italiano"
+
+#: config/settings.py
+msgid "English"
+msgstr "English"
+
+#: config/settings.py
+msgid "Administration panel"
+msgstr "Pannello di amministrazione"
+
+#: config/settings.py templates/allauth/layouts/base.html
+msgid "Administration"
+msgstr "Amministrazione"
+
+#: config/settings.py
+msgid "Users"
+msgstr "Utenti"
+
+#: config/settings.py
+msgid "Groups"
+msgstr "Gruppi"
+
+#: config/settings.py
+msgid "Background tasks"
+msgstr "Attività in background"
+
+#: config/settings.py
+msgid "Maintenance mode"
+msgstr "Modalità manutenzione"
+
+#: templates/400.html
+msgid "Bad request"
+msgstr "Richiesta non valida"
+
+#: templates/400.html
+msgid "The request could not be understood. Go back and try again."
+msgstr "La richiesta non è stata compresa. Torna indietro e riprova."
+
+#: templates/403.html
+msgid "Access denied"
+msgstr "Accesso negato"
+
+#: templates/403.html
+msgid "You do not have permission to open this page."
+msgstr "Non hai i permessi per aprire questa pagina."
+
+#: templates/404.html
+msgid "Page not found"
+msgstr "Pagina non trovata"
+
+#: templates/404.html
+msgid "The page you are looking for does not exist or has been moved."
+msgstr "La pagina che cerchi non esiste o è stata spostata."
+
+#: templates/500.html
+msgid "Something went wrong"
+msgstr "Qualcosa è andato storto"
+
+#: templates/500.html
+msgid "An unexpected error occurred on our side. Please try again in a moment."
+msgstr "Si è verificato un errore imprevisto. Riprova tra qualche istante."
+
+#: templates/503.html
+msgid "Back soon"
+msgstr "Torniamo presto"
+
+#: templates/503.html
+msgid "The site is under maintenance. Please try again in a little while."
+msgstr "Il sito è in manutenzione. Riprova tra poco."
+
+#: templates/account/delete.html templates/account/manage.html
+msgid "Delete account"
+msgstr "Elimina account"
+
+#: templates/account/delete.html
+#, python-format
+msgid ""
+"The account <strong>%(email)s</strong> and everything in it will be removed "
+"for good. This cannot be undone."
+msgstr ""
+"L'account <strong>%(email)s</strong> e tutto ciò che contiene saranno "
+"eliminati definitivamente. L'operazione non può essere annullata."
+
+#: templates/account/delete.html
+msgid "Delete my account"
+msgstr "Elimina il mio account"
+
+#: templates/account/delete.html
+msgid "Cancel"
+msgstr "Annulla"
+
+#: templates/account/login.html
+msgid "Log in"
+msgstr "Accedi"
+
+#: templates/account/login.html
+msgid "No account yet?"
+msgstr "Non hai ancora un account?"
+
+#: templates/account/login.html
+msgid "Sign up"
+msgstr "Registrati"
+
+#: templates/account/manage.html
+msgid "Email address"
+msgstr "Indirizzo email"
+
+#: templates/account/manage.html
+msgid "Verified"
+msgstr "Verificato"
+
+#: templates/account/manage.html
+msgid "Unverified"
+msgstr "Non verificato"
+
+#: templates/account/manage.html
+msgid "Change email address"
+msgstr "Cambia indirizzo email"
+
+#: templates/account/manage.html
+msgid "Security"
+msgstr "Sicurezza"
+
+#: templates/account/manage.html
+msgid ""
+"Your password, the second factor asked at login, and the devices you are "
+"logged in from."
+msgstr ""
+"La tua password, il secondo fattore richiesto all'accesso e i dispositivi da "
+"cui hai effettuato l'accesso."
+
+#: templates/account/manage.html
+msgid "Change password"
+msgstr "Cambia password"
+
+#: templates/account/manage.html
+msgid "Two-factor authentication"
+msgstr "Autenticazione a due fattori"
+
+#: templates/account/manage.html
+msgid "Sessions"
+msgstr "Sessioni"
+
+#: templates/account/manage.html
+msgid "Removes your account and everything in it, for good."
+msgstr "Elimina definitivamente il tuo account e tutto ciò che contiene."
+
+#: templates/allauth/layouts/base.html
+msgid "Log out"
+msgstr "Esci"
+
+#: templates/errors/base.html
+msgid "Back to the home page"
+msgstr "Torna alla pagina iniziale"

@@ -1,0 +1,51 @@
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+.coverage
+.coverage.*
+htmlcov/
+*.egg-info/
+*.log
+
+# Environment — never commit real credentials
+.env*
+!.env.example
+!.env.hosted.example
+!.env.selfhost.example
+
+# Node / compiled CSS
+node_modules/
+django/static/css/app.css
+
+# Django
+staticfiles/
+media/
+# Compiled translations (make compilemessages; built into the image)
+*.mo
+
+# Spreadsheets (the source PartitaIva2026.xlsx, bank and broker exports): real
+# personal financial data, keep it out of git
+*.xlsx
+*.xlsm
+*.xls
+*.ods
+
+# Database dumps (make backup / <env>-backup): real data
+backups/
+*.dump
+
+# Private keys and certificates
+*.pem
+*.key
+
+# Machine-specific additions to the hosted stack (proxy network, labels)
+docker/compose.override.yaml
+
+# Personal editor / agent settings and OS noise
+.claude/settings.local.json
+.idea/
+.DS_Store

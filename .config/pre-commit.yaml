@@ -1,0 +1,66 @@
+# Git hooks, run by the pre-commit framework (https://pre-commit.com).
+#
+# Kept in .config/ with the other linter settings instead of the repository
+# root, so pre-commit must be told where it is: use the make targets (a bare
+# `pre-commit run` needs `-c .config/pre-commit.yaml`).
+#
+#   make hooks       install them (done by `make setup`)
+#   make hooks-run   run every hook on every file, as CI does
+#
+# Third-party hooks are pinned to a release (`pre-commit autoupdate` bumps
+# them). pre-commit installs each tool itself, so none of
+# them can be silently skipped; hadolint runs from its Docker image.
+
+minimum_pre_commit_version: "4.0.0"
+
+repos:
+  - repo: local
+    hooks:
+      # Real data and credentials must never be committed, whatever .gitignore says.
+      - id: forbidden-files
+        name: no spreadsheets, dumps, keys or env files
+        language: fail
+        entry: "Real data and credentials must never be committed:"
+        files: '(\.(xlsx|xlsm|xls|ods|dump|pem|key)$|(^|/)\.env($|\.))'
+        exclude: '(^|/)\.env(\.hosted|\.selfhost)?\.example$'
+      # The project's own, locked versions of ruff and mypy (django/uv.lock).
+      - id: ruff
+        name: ruff (make lint)
+        language: system
+        entry: make lint
+        pass_filenames: false
+        files: '^django/.*(\.py|pyproject\.toml)$'
+      - id: mypy
+        name: mypy (make typecheck)
+        language: system
+        entry: make typecheck
+        pass_filenames: false
+        files: '^django/.*(\.py|pyproject\.toml)$'
+
+  # Secret scanning of what is being committed. Known public values are
+  # allowlisted in .config/gitleaks.toml; CI also scans the history (`make secrets`).
+  - repo: https://github.com/gitleaks/gitleaks
+    rev: v8.30.1
+    hooks:
+      - id: gitleaks
+        args: [--config, .config/gitleaks.toml]
+
+  - repo: https://github.com/shellcheck-py/shellcheck-py
+    rev: v0.11.0.1
+    hooks:
+      - id: shellcheck
+        # Also the nginx entrypoint snippet, which is sourced, not executed.
+        types: [text]
+        files: '(\.sh|\.envsh)$'
+
+  - repo: https://github.com/hadolint/hadolint
+    rev: v2.15.1
+    hooks:
+      - id: hadolint-docker
+        args: [--config, .config/hadolint.yaml]
+        exclude: '\.dockerignore$'
+
+  - repo: https://github.com/rhysd/actionlint
+    rev: v1.7.12
+    hooks:
+      - id: actionlint

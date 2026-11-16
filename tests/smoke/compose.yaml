@@ -1,0 +1,15 @@
+# Smoke test only (smoke.sh, next to this file), merged on top of
+# docker/compose.selfhost.yaml (relative paths resolve against that file):
+# turns on the TLS front of staging / production next to the plain HTTP port,
+# so one stack exercises both ways of facing the world. No certbot: nginx
+# serves its self-signed placeholder certificate.
+
+services:
+  nginx:
+    environment:
+      NGINX_TLS: "on"
+    ports:
+      - "127.0.0.1:${SMOKE_HTTP_TLS_PORT}:8081"
+      - "127.0.0.1:${SMOKE_HTTPS_PORT}:8443"
+    tmpfs:
+      - /etc/nginx/tls:uid=101,gid=101,mode=0700
