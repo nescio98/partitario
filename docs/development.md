@@ -118,17 +118,13 @@ build time.
 
 ## Continuous integration and releases
 
-`.github/workflows/ci.yml` runs `make hooks-run` (ruff, mypy, shellcheck,
-hadolint, actionlint), `make secrets`, `make test` and `make smoke` on every
-push and pull request: the same make targets a developer runs. Actions are
-pinned by commit SHA.
+CI is GitLab CI (`.gitlab/.gitlab-ci.yml`, set as the CI/CD configuration
+file in the project settings). The pipeline runs for merge requests and
+for `main`, and for nothing else. It has one job, `smoke`, on a runner tagged
+`local`: it prints the runner description and the short commit SHA. Lint,
+tests and builds do not run in CI yet; run `make hooks-run`, `make secrets`,
+`make test` and `make smoke` before opening a merge request.
 
-Pushing a tag `v1.2.3` also publishes `ghcr.io/<owner>/partitario:1.2.3` and
-`partitario-nginx:1.2.3` (plus `latest`), for `linux/amd64` and `linux/arm64`,
-and creates a GitHub release carrying the two files of a standalone install.
-The stacks pull those images when `PARTITARIO_IMAGE` and `PARTITARIO_VERSION`
-are set in the env file. The packages must be made public once, in the GitHub
-package settings, for others to pull them.
-
-The workflow is a GitHub Actions one: it runs only where the repository is
-hosted on GitHub.
+Releases are not automated yet: no job builds or publishes images. The stacks
+pull published images when `PARTITARIO_IMAGE` and `PARTITARIO_VERSION` are
+set in the env file, and build from the checkout otherwise.

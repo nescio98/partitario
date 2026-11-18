@@ -27,7 +27,7 @@
 ├── tests/        pytest/test-postgres.sh behind `make test`, smoke/ behind `make smoke`
 ├── scripts/      worktree-env.sh: the identity, ports and .env of this worktree
 ├── .config/      git hooks and linter settings: pre-commit, gitleaks, hadolint
-├── .github/      CI: quality gates, smoke test, images and release on a v* tag
+├── .gitlab/      CI: .gitlab-ci.yml, minimal pipeline for merge requests and main
 └── docs/         this folder
 ```
 
@@ -547,9 +547,8 @@ builder stage, and the smoke test checks an Italian string on the admin index.
 
 ## Testing
 
-Five layers, each a make target, all run by CI
-(`.github/workflows/ci.yml`; ruff and mypy run there as hooks, inside
-`make hooks-run`):
+Five layers, each a make target, run on the developer's machine (CI,
+`.gitlab/.gitlab-ci.yml`, does not run them yet: it only checks the runner):
 
 - **`make test`** — pytest + pytest-django against a real PostgreSQL, no
   database mocks. The tests live in `django/apps/<app>/tests/`;
@@ -570,9 +569,9 @@ Five layers, each a make target, all run by CI
   the dependency direction between the apps.
 - **`make hooks-run`** — every hook of `.config/pre-commit.yaml` on every
   file: ruff and mypy (through the make targets above), shellcheck on the
-  scripts, hadolint on the Dockerfile, actionlint on the workflow, plus the
+  scripts, hadolint on the Dockerfile, actionlint, plus the
   guard against data and `.env` files. The gitleaks hook scans what is being
-  committed; `make secrets` scans the whole history, and CI runs that one.
+  committed; `make secrets` scans the whole history.
   The settings of the hooks, gitleaks and hadolint are in `.config/`, so they
   are always run through the make targets.
 - **`make smoke`** — `tests/smoke/smoke.sh` builds the images and starts the
@@ -598,7 +597,5 @@ The application image runs as the fixed uid/gid `10001`.
 
 Compose files name the images `${PARTITARIO_IMAGE}:${PARTITARIO_VERSION}`. With
 no version in the env file `make <env>-up` builds from the checkout; with one
-it pulls that release. A `v*` tag makes CI push both images to ghcr.io, for
-`linux/amd64` and `linux/arm64` (buildx; arm64 under QEMU, with the CSS stage
-built natively), and create a release with `compose.selfhost.yaml` and its
-env template.
+it pulls that release. Publishing the images (for `linux/amd64` and
+`linux/arm64`) and the release is not automated yet: CI does not build them.

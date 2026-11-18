@@ -130,6 +130,7 @@ them; `make setup` already did). Heavier checks, for specific changes:
 | `make smoke` | after touching `docker/`, nginx or HTTP-related settings (about a minute: builds and tests the real stack) |
 | `make test-supabase` | to run the same tests on the local Supabase database |
 | `make secrets` | to scan the whole git history for secrets (gitleaks, in Docker) |
+| `make ci-lint` | after changing `.gitlab/.gitlab-ci.yml`: validates it against GitLab (`glab ci lint`, needs `glab auth login`) |
 
 ### 6. Changing something Supabase owns (role, schema, bucket)
 
@@ -233,8 +234,8 @@ e.g. `make prod-backup PG_CLIENT_IMAGE=postgres:18-alpine`.
 
 - **Restore.** There is no restore target; a dump is restored by hand with
   `pg_restore`.
-- **Release.** Images are built and published by CI on a `v*` tag, not by a
-  make target; see [development.md](development.md#continuous-integration-and-releases).
+- **Release.** No make target (and, for now, no CI job) publishes images;
+  see [development.md](development.md#continuous-integration-and-releases).
 - **Creating Django migrations or adding dependencies.** Those are
   `uv run manage.py makemigrations` and `uv add <pkg>`, from `django/`.
 - **Backing up S3 documents.** Only the on-disk `media` volume is archived.

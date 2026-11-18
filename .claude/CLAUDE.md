@@ -76,6 +76,7 @@ make lint / format  # ruff + import-linter (app dependency direction) / ruff aut
 make typecheck      # mypy + django-stubs
 make hooks-run      # all pre-commit hooks on all files (ruff, mypy, shellcheck, hadolint, actionlint)
 make secrets        # gitleaks over the whole git history (Docker)
+make ci-lint        # validate the GitLab CI file against GitLab (glab ci lint)
 make messages       # extract strings to django/locale; then make compilemessages
 make test           # pytest on a throwaway Postgres container (Docker only); ARGS="-k ..."
 make test-supabase  # same suite on the local Supabase database
@@ -200,6 +201,7 @@ prints the real ones.
   `make hooks-run` after touching shell scripts, the Dockerfile or the
   workflow; `make smoke` after touching `docker/`, nginx config or settings
   that change HTTP behaviour — and add a smoke check for what you changed.
+- After changing `.gitlab/.gitlab-ci.yml`, run `make ci-lint` and fix any error before committing.
 - Code is type-annotated: mypy rejects untyped functions outside tests and
   must stay clean (no blanket `# type: ignore`).
 - Settings read the environment only through `config/env.py` (`env_str`,

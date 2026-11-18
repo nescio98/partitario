@@ -23,7 +23,7 @@ COMPOSE := docker compose -p $(INSTANCE) -f docker/compose.dev.yaml
         worktree-up worktree-down worktree-logs worktree-destroy worktree-info worktree-list worktree-prune \
         migrate superuser check messages compilemessages lint format typecheck \
         test test-supabase smoke \
-        db-reset hooks hooks-run secrets backup \
+        db-reset hooks hooks-run secrets ci-lint backup \
         local-env local-push local-migrate local-superuser local-up local-down \
         local-check local-backup \
         staging-env staging-push staging-up staging-superuser staging-down staging-logs \
@@ -65,6 +65,12 @@ GITLEAKS_IMAGE ?= ghcr.io/gitleaks/gitleaks:v8.30.1
 secrets: ## Scan the whole git history for secrets (gitleaks, in Docker)
 	docker run --rm -v "$(CURDIR):/repo:ro" $(GITLEAKS_IMAGE) git /repo \
 		--config /repo/.config/gitleaks.toml --redact --no-banner
+
+# Validates the GitLab CI file against GitLab (needs glab, logged in: glab auth login).
+CI_FILE ?= .gitlab/.gitlab-ci.yml
+
+ci-lint: ## Validate the GitLab CI file against GitLab (glab ci lint)
+	glab ci lint $(CI_FILE)
 
 # Python only: the stylesheet is built inside the images (docker/Dockerfile).
 install: ## Install the Python dependencies
