@@ -1,0 +1,12 @@
+workflow:
+  rules:
+    - if: $CI_PIPELINE_SOURCE == "merge_request_event"
+    - if: $CI_COMMIT_BRANCH == "main"
+
+smoke:
+  image: alpine:3.20
+  tags:
+    - local
+  script:
+    - echo "Runner: $CI_RUNNER_DESCRIPTION"
+    - echo "Commit: $CI_COMMIT_SHORT_SHA"
