@@ -8,5 +8,5 @@ smoke:
   tags:
     - local
   script:
-    - echo "Runner: $CI_RUNNER_DESCRIPTION"
-    - echo "Commit: $CI_COMMIT_SHORT_SHA"
+    - 'echo "Runner: $CI_RUNNER_DESCRIPTION"'
+    - 'echo "Commit: $CI_COMMIT_SHORT_SHA"'
