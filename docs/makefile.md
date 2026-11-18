@@ -233,8 +233,8 @@ e.g. `make prod-backup PG_CLIENT_IMAGE=postgres:18-alpine`.
 
 - **Restore.** There is no restore target; a dump is restored by hand with
   `pg_restore`.
-- **Release.** Images are built and published by CI on a `v*` tag, not by a
-  make target; see [development.md](development.md#continuous-integration-and-releases).
+- **Release.** No make target (and, for now, no CI job) publishes images;
+  see [development.md](development.md#continuous-integration-and-releases).
 - **Creating Django migrations or adding dependencies.** Those are
   `uv run manage.py makemigrations` and `uv add <pkg>`, from `django/`.
 - **Backing up S3 documents.** Only the on-disk `media` volume is archived.
