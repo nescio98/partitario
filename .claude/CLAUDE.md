@@ -19,7 +19,8 @@ email, account page, two-factor authentication). None of the domain apps
 (`fiscal`, `banking`, `invoices`, `deadlines`, `dashboard`) exists yet, and
 the starter's defaults are untouched: signup is still open
 (`DJANGO_ACCOUNT_SIGNUP_OPEN`), which a single-user ledger must close before
-it is deployed.
+it is deployed. GitLab CI (`.gitlab/.gitlab-ci.yml`) runs the checks on merge requests and the
+default branch.
 
 Read before building anything:
 
@@ -48,10 +49,10 @@ tests/      pytest/test-postgres.sh (runner behind `make test`: throwaway Postgr
             smoke/ (smoke.sh + its compose overlay, behind `make smoke`);
             the unit tests themselves live in django/apps/<app>/tests/
 .config/    pre-commit.yaml (git hooks), gitleaks.toml, hadolint.yaml
-.github/    CI: hooks (ruff, mypy, shellcheck, hadolint, actionlint), secret scan,
-            test, smoke; amd64 + arm64 images and release on a v* tag
-docs/       architecture, domain (what each app must do), development,
-            deployment, selfhosting, makefile (targets by scenario)
+docs/       architecture, domain (what each app must do), development, deployment,
+            selfhosting, makefile (targets by scenario), worktrees
+.gitlab/    .gitlab-ci.yml: CI on a Docker-socket runner (tag `local`): MRs and the default
+            branch only, every job calls a make target; git hooks run locally only
 ```
 
 ## Commands
@@ -74,9 +75,9 @@ make migrate        # Django migrations (+ schema creation + RLS)
 make check          # manage.py check + check_services (schema, RLS, bucket)
 make lint / format  # ruff + import-linter (app dependency direction) / ruff autofix
 make typecheck      # mypy + django-stubs
-make hooks-run      # all pre-commit hooks on all files (ruff, mypy, shellcheck, hadolint, actionlint)
+make hooks-run      # all pre-commit hooks on all files (ruff, mypy, shellcheck, hadolint); not in CI
 make secrets        # gitleaks over the whole git history (Docker)
-make ci-lint        # validate the GitLab CI file against GitLab (glab ci lint)
+make ci-lint        # validate the GitLab CI file against GitLab (glab ci lint, glab 1.131.0+)
 make messages       # extract strings to django/locale; then make compilemessages
 make test           # pytest on a throwaway Postgres container (Docker only); ARGS="-k ..."
 make test-supabase  # same suite on the local Supabase database
@@ -94,8 +95,11 @@ cd django && uv add <pkg>      # dependencies — never pip
 The local Supabase project of the worktree must be running (`make supabase-start`)
 for `make env`, `migrate`, `check` and `test-supabase`; `make worktree-up`
 starts it.
-`make test` and `make smoke` need Docker only. `make messages` /
-`compilemessages` need GNU gettext. The Supabase CLI must be 2.121.0 or later.
+`make test` and `make smoke` need Docker, not Supabase. `make typecheck` and
+`make test` load the settings, so they need a `.env` (`cp .env.example .env`
+on a fresh clone, as CI does). `make messages` / `compilemessages` need GNU
+gettext. The Supabase CLI must be 2.121.0 or later; glab (`make ci-lint`)
+1.131.0 or later.
 
 In a git worktree run `make install worktree-up`: never start the stack of
 another worktree, and never assume port 8000 or 54322 — `make worktree-info`
@@ -194,12 +198,11 @@ prints the real ones.
 
 - Ruff lints and formats (line length 100); run `make format` before finishing.
 - Git hooks are the pre-commit framework (`.config/pre-commit.yaml`, next to
-  the gitleaks and hadolint settings). GitHub Actions are pinned by commit SHA
-  with the version in a comment.
+  the gitleaks and hadolint settings).
 - Tests in `apps/<app>/tests/test_*.py`, against real Postgres; shared fixtures
   in `django/conftest.py`. Before finishing: `make lint typecheck test`;
-  `make hooks-run` after touching shell scripts, the Dockerfile or the
-  workflow; `make smoke` after touching `docker/`, nginx config or settings
+  `make hooks-run` after touching shell scripts or the Dockerfile (CI does
+  not run the hooks); `make smoke` after touching `docker/`, nginx config or settings
   that change HTTP behaviour — and add a smoke check for what you changed.
 - After changing `.gitlab/.gitlab-ci.yml`, run `make ci-lint` and fix any error before committing.
 - Code is type-annotated: mypy rejects untyped functions outside tests and

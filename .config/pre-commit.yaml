@@ -5,11 +5,13 @@
 # `pre-commit run` needs `-c .config/pre-commit.yaml`).
 #
 #   make hooks       install them (done by `make setup`)
-#   make hooks-run   run every hook on every file, as CI does
+#   make hooks-run   run every hook on every file (not in CI: run it before pushing)
 #
 # Third-party hooks are pinned to a release (`pre-commit autoupdate` bumps
-# them). pre-commit installs each tool itself, so none of
-# them can be silently skipped; hadolint runs from its Docker image.
+# them). pre-commit installs each tool itself, so none of them is skipped on a
+# developer machine that lacks it; hadolint runs from its Docker image, which
+# needs a Docker that can mount the checkout. That is why the hooks do not run
+# in CI, where the runner's Docker cannot (docs/development.md).
 
 minimum_pre_commit_version: "4.0.0"
 
@@ -38,7 +40,7 @@ repos:
         files: '^django/.*(\.py|pyproject\.toml)$'
 
   # Secret scanning of what is being committed. Known public values are
-  # allowlisted in .config/gitleaks.toml; CI also scans the history (`make secrets`).
+  # allowlisted in .config/gitleaks.toml; `make secrets` (also in CI) scans the history.
   - repo: https://github.com/gitleaks/gitleaks
     rev: v8.30.1
     hooks:
@@ -59,8 +61,3 @@ repos:
       - id: hadolint-docker
         args: [--config, .config/hadolint.yaml]
         exclude: '\.dockerignore$'
-
-  - repo: https://github.com/rhysd/actionlint
-    rev: v1.7.12
-    hooks:
-      - id: actionlint

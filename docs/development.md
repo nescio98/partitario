@@ -75,6 +75,10 @@ make db-reset       # wipe this worktree's local database and rebuild it from mi
 make backup         # dump this worktree's local database schema into backups/ (gitignored)
 ```
 
+`typecheck` and `test` load the settings, so they need a `.env` (`make setup`
+writes it; on a fresh clone `cp .env.example .env` is enough, as in CI).
+`lint` and `smoke` need none.
+
 `make test ARGS="-k rls"` passes arguments to pytest. Commands that are not
 make targets run from `django/`, e.g. `cd django && uv run manage.py makemigrations`.
 
@@ -91,10 +95,11 @@ there for what you changed.
 ([pre-commit](https://pre-commit.com)). A commit is refused if it adds a
 spreadsheet, a dump, a key or an `.env` file, if
 [gitleaks](https://github.com/gitleaks/gitleaks) finds a secret in it, or if
-ruff, mypy, shellcheck, hadolint or actionlint complain.
+ruff, mypy, shellcheck or hadolint complain.
 
 - pre-commit installs the tools itself (hadolint runs from its Docker image),
-  so no check is skipped on a machine that lacks one.
+  so no check is skipped on a machine that lacks one. The hooks run on
+  developer machines only, not in CI (see below).
 - The settings live in `.config/`, so run the hooks through `make hooks-run`;
   a bare `pre-commit run` needs `-c .config/pre-commit.yaml`.
 - The public keys of the local Supabase stack in `.env.example` are
@@ -118,13 +123,46 @@ build time.
 
 ## Continuous integration and releases
 
-CI is GitLab CI (`.gitlab/.gitlab-ci.yml`, set as the CI/CD configuration
-file in the project settings). The pipeline runs for merge requests and
-for `main`, and for nothing else. It has one job, `smoke`, on a runner tagged
-`local`: it prints the runner description and the short commit SHA. Lint,
-tests and builds do not run in CI yet; run `make hooks-run`, `make secrets`,
-`make test` and `make smoke` before opening a merge request.
+`.gitlab/.gitlab-ci.yml` runs on merge requests and on the default branch, nothing
+else. It is not in the place GitLab looks by default (the repository root), so
+each project points GitLab at it once: Settings → CI/CD → General pipelines →
+"CI/CD configuration file" = `.gitlab/.gitlab-ci.yml`. Without that setting no
+pipeline starts, and GitLab reports no error. Each job calls the make target
+you run locally:
 
-Releases are not automated yet: no job builds or publishes images. The stacks
-pull published images when `PARTITARIO_IMAGE` and `PARTITARIO_VERSION` are
-set in the env file, and build from the checkout otherwise.
+| Job | Image | Runs |
+|---|---|---|
+| `lint-typecheck` | uv (Python 3.13) | `make lint typecheck` |
+| `test` | uv + Docker CLI | `make test` (throwaway Postgres on the host's Docker) |
+| `secrets` | gitleaks | `make secrets GITLEAKS=gitleaks GITLEAKS_REPO=.` (full history) |
+
+The Python jobs copy `.env.example` to `.env`: the settings, and mypy's
+Django plugin, need its development defaults (`make test` overrides `DB_*`).
+
+It is written for a GitLab runner with the Docker executor, the host's Docker
+socket and host networking, picked by the runner tag `local` (`default.tags`).
+That tag is the one thing in the file a project on another runner must change. The
+`secrets` job needs the `GITLEAKS` / `GITLEAKS_REPO` variables of
+`make secrets`, set in its script.
+
+On such a runner `/builds` is a Docker volume, so a container a job starts on
+the host's Docker cannot mount the checkout: `docker run -v $PWD:...` mounts
+an empty host directory and silently checks nothing. That is why `secrets`
+runs inside the gitleaks image instead of starting it, and why the git hooks
+are not in CI: hadolint runs from its own image the same way. ruff, mypy and
+gitleaks already have their jobs, and every job costs a start on the runner;
+shellcheck, hadolint and the check for committed data files run only on
+commit, so run `make hooks-run` before pushing a change to a shell script or
+the Dockerfile. Mounting `/builds` from the same path on the host (`builds_dir`
+and `volumes` in the runner's `config.toml`) would lift that limit.
+
+`make hooks-run`, `make smoke` and `make test-supabase` are not in CI: run them
+locally. After changing `.gitlab/.gitlab-ci.yml`, run `make ci-lint` (glab 1.131.0 or
+later: older releases such as 1.36.0, the Ubuntu package, fail with
+`rate: Wait(n=1) exceeds limiter's burst 0`).
+
+To publish a release, build the `production` and `nginx` targets of
+`docker/Dockerfile` (the nginx one with `--build-context docker=docker`) for
+`linux/amd64,linux/arm64`, and push them as `<image>:<version>` and
+`<image>-nginx:<version>`. The stacks pull them when `PARTITARIO_IMAGE` and
+`PARTITARIO_VERSION` are set in the env file.

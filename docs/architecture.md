@@ -15,7 +15,7 @@
 | Tasks      | Django's tasks framework, queued in the database ([django-tasks-db](https://pypi.org/project/django-tasks-db/)) and run by a `worker` container; mail goes through it |
 | Hosting    | Docker: nginx → gunicorn, plus the task worker; staging / production (TLS) and self-hosting; images for amd64 and arm64 |
 | I18n       | English source strings, Italian by default (`django/locale/it`)           |
-| Quality    | Ruff, mypy + django-stubs (typed code enforced), import-linter, pytest, end-to-end smoke test; pre-commit hooks (gitleaks, shellcheck, hadolint, actionlint) |
+| Quality    | Ruff, mypy + django-stubs (typed code enforced), import-linter, pytest, end-to-end smoke test; pre-commit hooks (gitleaks, shellcheck, hadolint); GitLab CI |
 
 ## Repository layout
 
@@ -27,7 +27,6 @@
 ├── tests/        pytest/test-postgres.sh behind `make test`, smoke/ behind `make smoke`
 ├── scripts/      worktree-env.sh: the identity, ports and .env of this worktree
 ├── .config/      git hooks and linter settings: pre-commit, gitleaks, hadolint
-├── .gitlab/      CI: .gitlab-ci.yml, minimal pipeline for merge requests and main
 └── docs/         this folder
 ```
 
@@ -86,10 +85,10 @@ per quarter) and bank movements (paid or not), while invoices need the fiscal
 parameters. Keeping scadenze out of `fiscal` avoids a cycle.
 
 The rule is enforced: `make lint` runs import-linter (`lint-imports`) with a
-layers contract declared in `django/pyproject.toml`, so an upward import fails
-the hook and CI. The contract lists `accounts` and `core` today: add each
-domain app to it when creating it, in the order above; two apps that must stay
-independent of each other go on the same line (`"fiscal | banking"`).
+layers contract declared in `django/pyproject.toml`, so an upward import fails the hook. The
+contract lists `accounts` and `core` today: add each domain app to it when
+creating it, in the order above; two apps that must stay independent of each
+other go on the same line (`"fiscal | banking"`).
 
 App labels are the short names (`accounts`, `core`): use them in
 `AUTH_USER_MODEL`, foreign-key strings and admin URL names. Python imports use
@@ -547,11 +546,11 @@ builder stage, and the smoke test checks an Italian string on the admin index.
 
 ## Testing
 
-Five layers, each a make target, run on the developer's machine (CI,
-`.gitlab/.gitlab-ci.yml`, does not run them yet: it only checks the runner):
+Five layers, each a make target (the GitLab CI pipeline runs the first ones:
+[development.md](development.md#continuous-integration-and-releases)):
 
 - **`make test`** — pytest + pytest-django against a real PostgreSQL, no
-  database mocks. The tests live in `django/apps/<app>/tests/`;
+  database mocks (it loads the settings, so it needs `.env`). The tests live in `django/apps/<app>/tests/`;
   `tests/pytest/test-postgres.sh` only runs them: it starts a throwaway
   `postgres` container (data in memory, random port) and overrides `DB_*`, so
   the suite needs Docker only; `make test-supabase` runs it on the local Supabase stack
@@ -569,7 +568,7 @@ Five layers, each a make target, run on the developer's machine (CI,
   the dependency direction between the apps.
 - **`make hooks-run`** — every hook of `.config/pre-commit.yaml` on every
   file: ruff and mypy (through the make targets above), shellcheck on the
-  scripts, hadolint on the Dockerfile, actionlint, plus the
+  scripts, hadolint on the Dockerfile, plus the
   guard against data and `.env` files. The gitleaks hook scans what is being
   committed; `make secrets` scans the whole history.
   The settings of the hooks, gitleaks and hadolint are in `.config/`, so they
@@ -597,5 +596,6 @@ The application image runs as the fixed uid/gid `10001`.
 
 Compose files name the images `${PARTITARIO_IMAGE}:${PARTITARIO_VERSION}`. With
 no version in the env file `make <env>-up` builds from the checkout; with one
-it pulls that release. Publishing the images (for `linux/amd64` and
-`linux/arm64`) and the release is not automated yet: CI does not build them.
+it pulls that release. Publishing is not automated here: build both targets
+for `linux/amd64,linux/arm64` (buildx; the CSS stage is built natively) and
+push them.

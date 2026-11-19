@@ -12,7 +12,8 @@ DJANGO := cd django &&
 
 # One identity per worktree, so that worktrees and projects run side by side:
 # <PROJECT>-<branch>-<hash of the path>, stored in .env by `make env` and
-# computed the same way without it (lint, test and smoke need no .env).
+# computed the same way without it (lint and smoke need no .env; typecheck and
+# test load the settings, which need one: `cp .env.example .env` is enough, as in CI).
 # Never write a container name or a local port here: derive them from these.
 WORKTREE_ENV := scripts/worktree-env.sh
 INSTANCE := $(shell $(WORKTREE_ENV) --instance)
@@ -56,17 +57,30 @@ hooks: ## Install the git hooks (pre-commit framework, .config/pre-commit.yaml)
 	@git config --unset core.hooksPath || true
 	$(PRE_COMMIT) install --config $(PRE_COMMIT_CONFIG)
 
-hooks-run: ## Run every hook on every file, as CI does
+hooks-run: ## Run every hook on every file (not in CI: run it before pushing)
 	$(PRE_COMMIT) run --config $(PRE_COMMIT_CONFIG) --all-files
 
 # The hook only sees what is being committed; this reads every commit.
+# CI runs inside the gitleaks image, where the repository cannot be mounted:
+# make secrets GITLEAKS=gitleaks GITLEAKS_REPO=.
+# In a git worktree .git is a file naming the shared git directory by its host
+# path: that directory is mounted at the same path, or no commit is found.
+# A scan that read no commit fails instead of reporting no leaks.
 GITLEAKS_IMAGE ?= ghcr.io/gitleaks/gitleaks:v8.30.1
+GIT_COMMON_DIR = $(shell git rev-parse --path-format=absolute --git-common-dir)
+GITLEAKS ?= docker run --rm -v "$(CURDIR):/repo:ro" \
+	-v "$(GIT_COMMON_DIR):$(GIT_COMMON_DIR):ro" $(GITLEAKS_IMAGE)
+GITLEAKS_REPO ?= /repo
 
 secrets: ## Scan the whole git history for secrets (gitleaks, in Docker)
-	docker run --rm -v "$(CURDIR):/repo:ro" $(GITLEAKS_IMAGE) git /repo \
-		--config /repo/.config/gitleaks.toml --redact --no-banner
+	@out=$$($(GITLEAKS) git $(GITLEAKS_REPO) --config $(GITLEAKS_REPO)/.config/gitleaks.toml \
+		--redact --no-banner --no-color 2>&1); status=$$?; printf '%s\n' "$$out"; \
+	[ $$status -eq 0 ] || exit $$status; \
+	printf '%s\n' "$$out" | grep -Eq '(^|[^0-9])[1-9][0-9]* commits scanned' || { \
+		echo "secrets: gitleaks scanned no commit (is the history mounted?)" >&2; exit 1; }
 
-# Validates the GitLab CI file against GitLab (needs glab, logged in: glab auth login).
+# Validates the GitLab CI file against GitLab (needs glab 1.131.0 or later, logged in:
+# glab auth login; older releases such as 1.36.0 fail with "exceeds limiter's burst").
 CI_FILE ?= .gitlab/.gitlab-ci.yml
 
 ci-lint: ## Validate the GitLab CI file against GitLab (glab ci lint)
@@ -184,7 +198,7 @@ backup: ## Dump this worktree's local database schema into backups/
 # compose itself, which reads the host name and the ports from it.
 
 # Which images run: PARTITARIO_VERSION in the env file names a published release
-# to pull (CI publishes one on every v* tag); without it they are built
+# to pull (the GitLab CI pipeline checks the code but publishes no images); without it they are built
 # from this checkout.
 hosted_version = $(shell sed -n 's/^PARTITARIO_VERSION=//p' .env.$(1) 2>/dev/null)
 

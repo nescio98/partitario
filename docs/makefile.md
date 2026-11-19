@@ -126,11 +126,11 @@ them; `make setup` already did). Heavier checks, for specific changes:
 
 | Target | When |
 |---|---|
-| `make hooks-run` | after touching shell scripts, the Dockerfile or the workflow (adds shellcheck, hadolint, actionlint) |
+| `make hooks-run` | after touching shell scripts or the Dockerfile (adds shellcheck, hadolint; CI does not run the hooks) |
 | `make smoke` | after touching `docker/`, nginx or HTTP-related settings (about a minute: builds and tests the real stack) |
 | `make test-supabase` | to run the same tests on the local Supabase database |
-| `make secrets` | to scan the whole git history for secrets (gitleaks, in Docker) |
-| `make ci-lint` | after changing `.gitlab/.gitlab-ci.yml`: validates it against GitLab (`glab ci lint`, needs `glab auth login`) |
+| `make secrets` | to scan the whole git history for secrets (gitleaks, in Docker; works in a git worktree, fails if no commit was scanned) |
+| `make ci-lint` | after changing `.gitlab/.gitlab-ci.yml`: validates it against GitLab (`glab ci lint`, glab 1.131.0 or later, needs `glab auth login`) |
 
 ### 6. Changing something Supabase owns (role, schema, bucket)
 
@@ -225,6 +225,7 @@ e.g. `make prod-backup PG_CLIENT_IMAGE=postgres:18-alpine`.
 | `CONFIRM=prod` | `prod-push`, `prod-up`, `prod-superuser` | skip the interactive confirmation |
 | `PG_CLIENT_IMAGE` | `*-backup` | image providing `pg_dump` |
 | `GITLEAKS_IMAGE` | `secrets` | image providing gitleaks |
+| `GITLEAKS`, `GITLEAKS_REPO` | `secrets` | gitleaks command and repository path; CI runs `GITLEAKS=gitleaks GITLEAKS_REPO=.` inside the gitleaks image |
 | `YES=1` | `worktree-prune` | skip the confirmation |
 | `SUPABASE_EXCLUDE` | `supabase-start`, `setup`, `worktree-up` | Supabase services to leave out, e.g. `rest,auth,studio,mail` |
 | `DEV_PORT_BASE` | `env`, `env-port` | first port of the project's block of 100 (default in the `Makefile`) |
@@ -234,8 +235,8 @@ e.g. `make prod-backup PG_CLIENT_IMAGE=postgres:18-alpine`.
 
 - **Restore.** There is no restore target; a dump is restored by hand with
   `pg_restore`.
-- **Release.** No make target (and, for now, no CI job) publishes images;
-  see [development.md](development.md#continuous-integration-and-releases).
+- **Release.** Building and publishing images is not automated (CI only
+  checks the code); see [development.md](development.md#continuous-integration-and-releases).
 - **Creating Django migrations or adding dependencies.** Those are
   `uv run manage.py makemigrations` and `uv add <pkg>`, from `django/`.
 - **Backing up S3 documents.** Only the on-disk `media` volume is archived.

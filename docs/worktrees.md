@@ -48,8 +48,8 @@ Every container, image, volume and compose project is named after the
 
 `scripts/worktree-env.sh` computes it once and stores it in `.env` as
 `WORKTREE_INSTANCE`. It is not recomputed while `.env` exists, so renaming the
-branch does not orphan running containers. Targets that need no `.env` (`lint`,
-`test`, `smoke`, CI) compute the same value on the fly.
+branch does not orphan running containers. Without `.env` (`lint`, `smoke`)
+the same value is computed on the fly.
 
 ### 2. No fixed port
 
