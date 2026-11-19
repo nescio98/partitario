@@ -1,0 +1,26 @@
+{% extends "account/base_manage.html" %}
+{% comment %} Confirmation asked by apps/accounts/views.py::delete. {% endcomment %}
+{% load i18n allauth %}
+
+{% block head_title %}{% translate "Delete account" %}{% endblock head_title %}
+
+{% block content %}
+    {% element h1 %}{% translate "Delete account" %}{% endelement %}
+    {% element p %}
+        {% blocktranslate with email=user.email trimmed %}
+            The account <strong>{{ email }}</strong> and everything in it will be
+            removed for good. This cannot be undone.
+        {% endblocktranslate %}
+    {% endelement %}
+    {% url 'account_delete' as delete_url %}
+    {% element form method="post" action=delete_url %}
+        {% slot body %}
+            {% csrf_token %}
+        {% endslot %}
+        {% slot actions %}
+            {% element button type="submit" tags="danger" %}{% translate "Delete my account" %}{% endelement %}
+            {% url 'account_manage' as manage_url %}
+            {% element button href=manage_url tags="secondary" %}{% translate "Cancel" %}{% endelement %}
+        {% endslot %}
+    {% endelement %}
+{% endblock content %}

@@ -1,0 +1,15 @@
+# gitleaks configuration (pre-commit hook and `make secrets`).
+# The default rules, minus the values below.
+
+[extend]
+useDefault = true
+
+# The S3 access key of the local Supabase CLI stack (`supabase start`): the
+# same on every machine and printed in Supabase's own documentation. Only
+# these exact values are allowed, so a real key in the same file is still caught.
+[[allowlists]]
+description = "Public S3 credentials of the local Supabase CLI stack"
+regexes = [
+    '''625729a08b95bf1b7ff351a663f3a23c''',
+    '''850181e4652dd023b7a98c58ae0d2d34bd487ee0cc3254aed6eda37307425907''',
+]

@@ -1,0 +1,194 @@
+# Staging: the stack for a single-purpose server facing the internet.
+#
+#   internet -> nginx :80/:443 (TLS, static files) -> gunicorn (Django) -> hosted Supabase
+#                 ^ certificate
+#               certbot (Let's Encrypt, HTTP challenge, automatic renewal)
+#
+# HTTPS is enforced: nginx terminates TLS with the certificate the certbot
+# sidecar obtains for DJANGO_ALLOWED_HOSTS, whose DNS must point at this server.
+#
+#   make staging-env        # create .env.staging from .env.hosted.example, then fill it in
+#   make staging-push       # Supabase migrations: role, schema, private bucket
+#   make staging-up         # build, migrate, start -> https://<DJANGO_ALLOWED_HOSTS>/
+#
+# This file and compose.prod.yaml must stay identical except for the
+# environment name (staging / prod): change both together. Staging is how a
+# change is tried before production. ${...} values come from .env.staging,
+# passed by the Makefile (`docker compose --env-file`). Paths are relative to
+# this folder.
+
+name: partitario-staging
+
+x-hardening: &hardening
+  restart: unless-stopped
+  init: true
+  # Nothing is written to the image filesystem; scratch space is tmpfs.
+  read_only: true
+  cap_drop:
+    - ALL
+  security_opt:
+    - no-new-privileges:true
+  pids_limit: 200
+  logging:
+    driver: json-file
+    options:
+      max-size: 10m
+      max-file: "5"
+
+services:
+  web:
+    <<: *hardening
+    # Local build unless PARTITARIO_VERSION names a published release.
+    image: ${PARTITARIO_IMAGE:-partitario}:${PARTITARIO_VERSION:-local}
+    build:
+      context: ../django
+      dockerfile: ../docker/Dockerfile
+      target: production
+    # No superuser is created here: its password would stay in the container
+    # environment for good. Create it once with `make staging-superuser`.
+    command: >
+      sh -c "python manage.py migrate --noinput &&
+             exec gunicorn config.wsgi:application"
+    env_file: ../.env.staging
+    environment:
+      ENV: "staging"
+      DJANGO_DEBUG: "False"
+    tmpfs:
+      - /tmp
+    mem_limit: 512m
+    depends_on:
+      cache:
+        condition: service_healthy
+        # Only when the in-memory cache is enabled (profile `cache`).
+        required: false
+    # Not published: only nginx talks to gunicorn, over the compose network.
+    expose:
+      - "8000"
+    # Readiness: healthy only while gunicorn answers AND the database does
+    # (/readyz). nginx starts once this passes; `docker compose ps` shows it.
+    healthcheck:
+      test:
+        - CMD
+        - python
+        - -c
+        - "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/readyz', timeout=5)"
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+
+  # Background tasks (mail, and whatever the project queues): same image as
+  # `web`, running the task worker instead of gunicorn. It starts once `web` is
+  # healthy, that is after the migrations. Finished tasks are pruned once a
+  # day: the arguments of a queued mail are the mail itself.
+  worker:
+    <<: *hardening
+    image: ${PARTITARIO_IMAGE:-partitario}:${PARTITARIO_VERSION:-local}
+    command: >
+      sh -c "while :; do
+               python manage.py prune_db_task_results --min-age-days 1 --failed-min-age-days 14;
+               sleep 86400;
+             done &
+             exec python manage.py db_worker"
+    env_file: ../.env.staging
+    environment:
+      ENV: "staging"
+      DJANGO_DEBUG: "False"
+    tmpfs:
+      - /tmp
+    mem_limit: 256m
+    depends_on:
+      web:
+        condition: service_healthy
+
+  nginx:
+    <<: *hardening
+    image: ${PARTITARIO_IMAGE:-partitario}-nginx:${PARTITARIO_VERSION:-local}
+    build:
+      context: ../django
+      dockerfile: ../docker/Dockerfile
+      target: nginx
+      additional_contexts:
+        docker: .
+    environment:
+      # Terminate TLS on 80/443 with the certificate of the certbot sidecar.
+      NGINX_TLS: "on"
+      NGINX_SERVER_NAME: ${DJANGO_ALLOWED_HOSTS:?Set DJANGO_ALLOWED_HOSTS in the env file}
+    ports:
+      - "80:8081"
+      - "443:8443"
+    volumes:
+      - certs:/certs:ro
+      - acme-webroot:/var/www/certbot:ro
+    tmpfs:
+      - /tmp:uid=101,gid=101
+      - /etc/nginx/conf.d:uid=101,gid=101
+      - /etc/nginx/tls:uid=101,gid=101,mode=0700
+    mem_limit: 128m
+    depends_on:
+      web:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "wget", "-q", "-O", "/dev/null", "http://127.0.0.1:8080/nginx-health"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+
+  certbot:
+    <<: *hardening
+    image: certbot/certbot:v5.10.0
+    entrypoint: ["/bin/sh", "/run.sh"]
+    environment:
+      DOMAINS: ${DJANGO_ALLOWED_HOSTS}
+      LETSENCRYPT_EMAIL: ${LETSENCRYPT_EMAIL:?Set LETSENCRYPT_EMAIL in the env file}
+      LETSENCRYPT_STAGING: ${LETSENCRYPT_STAGING:-false}
+    # Root inside the container, but only to hand the certificate to nginx.
+    cap_add:
+      - CHOWN
+      - DAC_OVERRIDE
+      - FOWNER
+    volumes:
+      - ./certbot/run.sh:/run.sh:ro
+      - letsencrypt:/etc/letsencrypt
+      - certs:/certs
+      - acme-webroot:/var/www/certbot
+    tmpfs:
+      - /tmp
+      - /var/lib/letsencrypt
+      - /var/log/letsencrypt
+    mem_limit: 256m
+    depends_on:
+      nginx:
+        condition: service_healthy
+
+  # Optional in-memory cache (Valkey, Redis-compatible), for projects that cache
+  # for speed. Enabled by adding `cache` to COMPOSE_PROFILES and setting
+  # DJANGO_CACHE_URL=redis://cache:6379/0 in the env file. Without it the cache
+  # is a table in the database. Not published; nothing is persisted.
+  cache:
+    <<: *hardening
+    profiles: ["cache"]
+    image: valkey/valkey:8-alpine
+    # The image's unprivileged user.
+    user: valkey
+    command: >
+      valkey-server --save "" --appendonly no
+      --maxmemory 64mb --maxmemory-policy allkeys-lru
+    tmpfs:
+      - /data
+    mem_limit: 128m
+    healthcheck:
+      test: ["CMD", "valkey-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 5s
+
+volumes:
+  # Let's Encrypt account and certificate history: root only, certbot only.
+  letsencrypt:
+  # The current certificate, readable by nginx.
+  certs:
+  # HTTP-01 challenge files, written by certbot and served by nginx.
+  acme-webroot:

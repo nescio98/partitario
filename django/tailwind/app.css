@@ -1,0 +1,60 @@
+/*
+ * Project stylesheet, compiled by Tailwind 4 into static/css/app.css and
+ * loaded after Unfold's own CSS (settings.UNFOLD["STYLES"]).
+ *
+ * Unfold already ships Tailwind's preflight and the utilities its own
+ * templates use. This file only adds the utilities found in OUR templates and
+ * Python files, so we import the theme + utilities layers and skip preflight.
+ */
+@layer theme, base, components, utilities;
+@import "tailwindcss/theme.css" layer(theme);
+@import "tailwindcss/utilities.css" layer(utilities);
+
+@source "../templates";
+@source "../apps";
+
+/* Same dark-mode switch as Unfold: a `.dark` class on <html>. */
+@custom-variant dark {
+  @media not print {
+    &:where(.dark, .dark *) {
+      @slot;
+    }
+  }
+}
+
+@theme {
+  --font-sans: "Inter", sans-serif;
+}
+
+/*
+ * Reuse Unfold's runtime palette (settings.UNFOLD["COLORS"] -> CSS variables),
+ * so `bg-primary-600`, `text-base-500`, ... match the admin and follow any
+ * future re-theme without recompiling.
+ */
+@theme inline {
+  --radius-default: var(--border-radius, 6px);
+
+  --color-primary-50: var(--color-primary-50);
+  --color-primary-100: var(--color-primary-100);
+  --color-primary-200: var(--color-primary-200);
+  --color-primary-300: var(--color-primary-300);
+  --color-primary-400: var(--color-primary-400);
+  --color-primary-500: var(--color-primary-500);
+  --color-primary-600: var(--color-primary-600);
+  --color-primary-700: var(--color-primary-700);
+  --color-primary-800: var(--color-primary-800);
+  --color-primary-900: var(--color-primary-900);
+  --color-primary-950: var(--color-primary-950);
+
+  --color-base-50: var(--color-base-50);
+  --color-base-100: var(--color-base-100);
+  --color-base-200: var(--color-base-200);
+  --color-base-300: var(--color-base-300);
+  --color-base-400: var(--color-base-400);
+  --color-base-500: var(--color-base-500);
+  --color-base-600: var(--color-base-600);
+  --color-base-700: var(--color-base-700);
+  --color-base-800: var(--color-base-800);
+  --color-base-900: var(--color-base-900);
+  --color-base-950: var(--color-base-950);
+}

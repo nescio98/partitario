@@ -1,0 +1,206 @@
+# Self-hosting: partitario on your own machine, behind the reverse proxy it
+# already has - a homelab VM serving partitario.home.arpa next to other apps.
+#
+#   browser -> your reverse proxy (TLS) -> nginx 127.0.0.1:8080 -> gunicorn (Django)
+#                                                                      |-> PostgreSQL
+#                                                                      '-> documents
+#
+# THIS FILE IS SELF-CONTAINED: it runs published images and needs nothing else
+# from the repository. Put it in a folder with a `.env` made from
+# .env.selfhost.example, then:
+#
+#   docker compose -f compose.selfhost.yaml up -d
+#   docker compose -f compose.selfhost.yaml run --rm web python manage.py createsuperuser
+#
+# (From a clone of the repository the same thing is `make selfhost-env`,
+# `make selfhost-up`, `make selfhost-superuser`; without PARTITARIO_VERSION in
+# the env file the images are built locally instead of pulled.)
+#
+# Out of the box it brings its own PostgreSQL (profile `db`) and keeps the
+# uploaded documents in a Docker volume. Both are optional: point DB_* at any
+# PostgreSQL server, and S3_* at any S3-compatible store, in the env file.
+#
+# nginx speaks plain HTTP on one port (127.0.0.1:8080 by default). TLS and
+# host names belong to your reverse proxy - Caddy, Traefik, nginx, ... - which
+# must serve the site over HTTPS, pass the original Host header and set
+# X-Forwarded-For and X-Forwarded-Proto.
+#
+# What is specific to your machine (the Docker network or the labels of a proxy
+# that runs in a container) goes in a compose.override.yaml of your own, passed
+# as a second -f (the Makefile merges docker/compose.override.yaml when present).
+# See docs/selfhosting.md.
+
+name: partitario-selfhost
+
+x-hardening: &hardening
+  restart: unless-stopped
+  init: true
+  # Nothing is written to the image filesystem; scratch space is tmpfs.
+  read_only: true
+  cap_drop:
+    - ALL
+  security_opt:
+    - no-new-privileges:true
+  pids_limit: 200
+  logging:
+    driver: json-file
+    options:
+      max-size: 10m
+      max-file: "5"
+
+services:
+  web:
+    <<: *hardening
+    image: ${PARTITARIO_IMAGE:-partitario}:${PARTITARIO_VERSION:-local}
+    # No superuser is created here: its password would stay in the container
+    # environment for good. Create it once with `manage.py createsuperuser`.
+    command: >
+      sh -c "python manage.py migrate --noinput &&
+             exec gunicorn config.wsgi:application"
+    # `.env` next to this file; the Makefile points it at ../.env.selfhost.
+    env_file: ${ENV_FILE:-.env}
+    # Lets DB_HOST / S3_ENDPOINT_URL name a service running on this machine.
+    extra_hosts:
+      - host.docker.internal:host-gateway
+    environment:
+      ENV: "selfhost"
+      DJANGO_DEBUG: "False"
+    volumes:
+      # Uploaded documents when DJANGO_STORAGE_BACKEND=filesystem.
+      - media:/data/media
+    tmpfs:
+      - /tmp
+    mem_limit: 512m
+    depends_on:
+      db:
+        condition: service_healthy
+        # Only when the bundled database is enabled (profile `db`).
+        required: false
+      cache:
+        condition: service_healthy
+        # Only when the in-memory cache is enabled (profile `cache`).
+        required: false
+    # Not published: only nginx talks to gunicorn, over the compose network.
+    expose:
+      - "8000"
+    # Readiness: healthy only while gunicorn answers AND the database does
+    # (/readyz). nginx starts once this passes; `docker compose ps` shows it.
+    healthcheck:
+      test:
+        - CMD
+        - python
+        - -c
+        - "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/readyz', timeout=5)"
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+
+  # Background tasks (mail, and whatever the project queues): same image as
+  # `web`, running the task worker instead of gunicorn. It starts once `web` is
+  # healthy, that is after the migrations. Finished tasks are pruned once a
+  # day: the arguments of a queued mail are the mail itself.
+  worker:
+    <<: *hardening
+    image: ${PARTITARIO_IMAGE:-partitario}:${PARTITARIO_VERSION:-local}
+    command: >
+      sh -c "while :; do
+               python manage.py prune_db_task_results --min-age-days 1 --failed-min-age-days 14;
+               sleep 86400;
+             done &
+             exec python manage.py db_worker"
+    env_file: ${ENV_FILE:-.env}
+    extra_hosts:
+      - host.docker.internal:host-gateway
+    environment:
+      ENV: "selfhost"
+      DJANGO_DEBUG: "False"
+    volumes:
+      - media:/data/media
+    tmpfs:
+      - /tmp
+    mem_limit: 256m
+    depends_on:
+      web:
+        condition: service_healthy
+
+  nginx:
+    <<: *hardening
+    image: ${PARTITARIO_IMAGE:-partitario}-nginx:${PARTITARIO_VERSION:-local}
+    environment:
+      NGINX_SERVER_NAME: ${DJANGO_ALLOWED_HOSTS:?Set DJANGO_ALLOWED_HOSTS in the env file}
+    # For the reverse proxy only: loopback unless BIND_ADDRESS says otherwise.
+    ports:
+      - "${BIND_ADDRESS:-127.0.0.1}:${HTTP_PORT:-8080}:8080"
+    volumes:
+      # Read-only: nginx sends the documents Django has authorised.
+      - media:/data/media:ro
+    tmpfs:
+      - /tmp:uid=101,gid=101
+      - /etc/nginx/conf.d:uid=101,gid=101
+    mem_limit: 128m
+    depends_on:
+      web:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "wget", "-q", "-O", "/dev/null", "http://127.0.0.1:8080/nginx-health"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+
+  # Bundled PostgreSQL, enabled by COMPOSE_PROFILES=db in the env file. Not
+  # published anywhere: only `web` reaches it, over the compose network.
+  # Remove `db` from COMPOSE_PROFILES to use a server of your own instead.
+  db:
+    <<: *hardening
+    profiles: ["db"]
+    image: postgres:17-alpine
+    # The image's unprivileged user; the data volume already belongs to it.
+    user: postgres
+    environment:
+      POSTGRES_DB: ${DB_NAME:-partitario}
+      POSTGRES_USER: ${DB_USER:-partitario_app}
+      POSTGRES_PASSWORD: ${DB_PASSWORD:?Set DB_PASSWORD in the env file}
+    volumes:
+      - db-data:/var/lib/postgresql/data
+    tmpfs:
+      - /tmp
+      - /var/run/postgresql:uid=70,gid=70
+    shm_size: 128m
+    mem_limit: 512m
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U \"$$POSTGRES_USER\" -d \"$$POSTGRES_DB\""]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 20s
+
+  # Optional in-memory cache (Valkey, Redis-compatible), for projects that cache
+  # for speed. Enabled by adding `cache` to COMPOSE_PROFILES and setting
+  # DJANGO_CACHE_URL=redis://cache:6379/0 in the env file. Without it the cache
+  # is a table in the database. Not published; nothing is persisted.
+  cache:
+    <<: *hardening
+    profiles: ["cache"]
+    image: valkey/valkey:8-alpine
+    # The image's unprivileged user.
+    user: valkey
+    command: >
+      valkey-server --save "" --appendonly no
+      --maxmemory 64mb --maxmemory-policy allkeys-lru
+    tmpfs:
+      - /data
+    mem_limit: 128m
+    healthcheck:
+      test: ["CMD", "valkey-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 5s
+
+volumes:
+  # The bundled database. Back it up: `make selfhost-backup`.
+  db-data:
+  # Uploaded documents (DJANGO_STORAGE_BACKEND=filesystem). Back it up too.
+  media:

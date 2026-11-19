@@ -1,0 +1,146 @@
+# The application server of every hosted stack: serves the collected static
+# files and proxies everything else to gunicorn, over plain HTTP on 8080.
+# TLS is terminated in front of it: by the reverse proxy of the machine
+# (compose.selfhost.yaml), or by this same nginx through tls.conf.template
+# (compose.staging.yaml / compose.prod.yaml). Whoever is in front must pass the
+# original Host header and set X-Forwarded-For and X-Forwarded-Proto.
+#
+# Rendered at container start by the nginx image (envsubst):
+#   ${NGINX_SERVER_NAME}  <- DJANGO_ALLOWED_HOSTS of the env file
+
+server_tokens off;
+
+gzip on;
+gzip_comp_level 5;
+gzip_min_length 1024;
+gzip_proxied any;
+gzip_vary on;
+gzip_types text/plain text/css application/javascript application/json image/svg+xml;
+
+# Uploaded documents: keep in line with the bucket limit (20 MiB).
+client_max_body_size 20m;
+
+# Slow clients are dropped instead of holding a connection open.
+client_header_timeout 15s;
+client_body_timeout 30s;
+send_timeout 30s;
+
+# The client address is the one reported by the proxy. Proxies are expected on
+# this machine or its private network; the published port must not be
+# reachable by anyone else (it is bound to 127.0.0.1 by default).
+set_real_ip_from 127.0.0.0/8;
+set_real_ip_from 10.0.0.0/8;
+set_real_ip_from 172.16.0.0/12;
+set_real_ip_from 192.168.0.0/16;
+real_ip_header X-Forwarded-For;
+real_ip_recursive on;
+
+# Scheme the browser used, as reported by the proxy. Anything but https is
+# redirected to HTTPS.
+map $http_x_forwarded_proto $forwarded_proto {
+    default http;
+    https   https;
+}
+
+# Brute-force protection for the login and signup forms: only POSTs are counted (an empty
+# key is not rate limited), 10 attempts per minute per client address.
+map $request_method $login_limit_key {
+    default "";
+    POST    $binary_remote_addr;
+}
+limit_req_zone $login_limit_key zone=login:10m rate=10r/m;
+limit_req_status 429;
+
+# --- Unknown hosts -------------------------------------------------------------
+# Requests whose Host is not one of ours never reach Django.
+
+server {
+    listen 8080 default_server;
+    server_name _;
+
+    # Container healthcheck.
+    location = /nginx-health {
+        access_log off;
+        default_type text/plain;
+        return 200 "ok\n";
+    }
+    location / {
+        return 444;
+    }
+}
+
+# --- The application -------------------------------------------------------------
+
+server {
+    listen 8080;
+    server_name ${NGINX_SERVER_NAME};
+
+    if ($forwarded_proto != https) {
+        return 301 https://$host$request_uri;
+    }
+
+    keepalive_timeout 30s;
+
+    # Docker's embedded DNS, re-resolved so a recreated `web` container is
+    # picked up without restarting nginx.
+    resolver 127.0.0.11 valid=10s;
+    set $upstream http://web:8000;
+
+    proxy_http_version 1.1;
+    proxy_set_header Connection "";
+    proxy_connect_timeout 5s;
+    proxy_send_timeout 60s;
+    proxy_read_timeout 60s;
+
+    # Every forwarded header is set here, never passed on as received. $host is
+    # the validated server name (no client port).
+    proxy_set_header Host $host;
+    proxy_set_header X-Real-IP $remote_addr;
+    proxy_set_header X-Forwarded-For $remote_addr;
+    proxy_set_header X-Forwarded-Proto $forwarded_proto;
+    proxy_set_header X-Forwarded-Host "";
+
+    # Baked into the image at build time (see the `nginx` stage in Dockerfile).
+    # File names carry a content hash, so they never change once published.
+    # The security headers of every other response are set by Django.
+    location /static/ {
+        alias /usr/share/nginx/html/static/;
+        access_log off;
+        add_header Cache-Control "public, max-age=31536000, immutable";
+        add_header X-Content-Type-Options "nosniff" always;
+    }
+
+    # Uploaded documents with DJANGO_STORAGE_BACKEND=filesystem. Never reachable from
+    # outside: Django checks the login, then hands the transfer to nginx with
+    # an X-Accel-Redirect header (apps/core/views.py). Uploads are untrusted,
+    # so they are served sandboxed and never sniffed.
+    location /_protected_media/ {
+        internal;
+        alias /data/media/;
+        add_header Cache-Control "private, no-store" always;
+        add_header X-Content-Type-Options "nosniff" always;
+        add_header Content-Security-Policy "sandbox; default-src 'none'" always;
+    }
+
+    # Container healthchecks only (apps/core/middleware.py).
+    location ~ ^/(healthz|readyz)$ {
+        return 404;
+    }
+
+    location = /admin/login/ {
+        limit_req zone=login burst=5 nodelay;
+        proxy_pass $upstream;
+    }
+    location = /accounts/login/ {
+        limit_req zone=login burst=5 nodelay;
+        proxy_pass $upstream;
+    }
+    location = /accounts/signup/ {
+        limit_req zone=login burst=5 nodelay;
+        proxy_pass $upstream;
+    }
+
+    location / {
+        proxy_pass $upstream;
+    }
+}

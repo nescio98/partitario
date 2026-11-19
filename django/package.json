@@ -1,0 +1,10 @@
+{
+  "name": "partitario",
+  "private": true,
+  "scripts": {
+    "build:css": "tailwindcss -i ./tailwind/app.css -o ./static/css/app.css --minify"
+  },
+  "devDependencies": {
+    "@tailwindcss/cli": "^4.2.2"
+  }
+}

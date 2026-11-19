@@ -1,0 +1,121 @@
+[project]
+name = "partitario"
+version = "0.0.0"
+description = "Ledger, tax and bank-account tracker for an Italian partita IVA in regime forfettario"
+requires-python = ">=3.13"
+dependencies = [
+    "django[argon2]>=6.1.3,<6.2",
+    "django-storages[s3]>=1.14",
+    "django-unfold==0.110.1",
+    "gunicorn>=23",
+    "psycopg[binary]>=3.2",
+    "python-dotenv>=1.0",
+    "django-allauth[mfa]>=65.22.1",
+    "django-hijack>=3.7.9",
+    "django-maintenance-mode>=0.23.0",
+    "redis>=8.1.0",
+    "django-tasks-db>=0.13.0",
+]
+
+[dependency-groups]
+dev = [
+    "django-stubs>=6.1.2",
+    "import-linter>=2.16",
+    "mypy>=2.4.1",
+    "pre-commit>=4.7.0",
+    "pytest>=9.2.0",
+    "pytest-django>=4.14.0",
+    "ruff>=0.17.5",
+]
+
+[tool.ruff]
+line-length = 100
+target-version = "py313"
+extend-exclude = ["**/migrations/*", ".venv", "node_modules", "staticfiles"]
+
+[tool.ruff.lint]
+select = [
+    "E", "F", "W", # pycodestyle, pyflakes
+    "I",   # import order
+    "UP",  # modern syntax for the target Python
+    "B",   # likely bugs
+    "SIM", # simplifications
+    "C4",  # comprehensions
+    "DJ",  # Django
+    "DTZ", # naive datetimes
+    "PT",  # pytest style
+    "PTH", # pathlib over os.path
+    "S",   # security (bandit)
+    "RUF",
+]
+ignore = [
+    "E501",   # line length is the formatter's job
+    "RUF012", # Django idiom: mutable class-level lists in Meta / ModelAdmin
+]
+
+[tool.ruff.lint.isort]
+known-first-party = ["apps", "config"]
+
+[tool.ruff.lint.per-file-ignores]
+# Tests assert, hard-code throwaway passwords and run subprocesses on purpose.
+"**/tests/**" = ["B", "SIM", "S"]
+"conftest.py" = ["B", "SIM", "S"]
+
+[tool.ruff.format]
+quote-style = "double"
+indent-style = "space"
+
+[tool.pytest.ini_options]
+DJANGO_SETTINGS_MODULE = "config.settings"
+python_files = ["test_*.py"]
+addopts = ["--strict-markers", "-ra"]
+
+[tool.mypy]
+python_version = "3.13"
+files = ["apps", "config", "conftest.py", "gunicorn.conf.py"]
+exclude = ["/migrations/"]
+plugins = ["mypy_django_plugin.main"]
+check_untyped_defs = true
+warn_unused_ignores = true
+warn_redundant_casts = true
+warn_unreachable = true
+no_implicit_optional = true
+# Application code is fully annotated; tests are checked but exempt (below).
+disallow_untyped_defs = true
+disallow_incomplete_defs = true
+
+# Loads the real settings, so mypy needs the same environment as Django (.env).
+[tool.django-stubs]
+django_settings_module = "config.settings"
+
+[[tool.mypy.overrides]]
+module = ["apps.*.tests.*", "conftest"]
+disallow_untyped_defs = false
+disallow_incomplete_defs = false
+
+# Third-party packages that ship no type information.
+[[tool.mypy.overrides]]
+module = [
+    "storages.*",
+    "unfold.*",
+    "allauth.*",
+    "hijack.*",
+    "maintenance_mode.*",
+]
+ignore_missing_imports = true
+
+# The dependency direction between the apps (docs/architecture.md), enforced by
+# `lint-imports` (part of `make lint`): an app imports only from the layers
+# below it. Add every new app here, above `accounts` (`a | b` on one line
+# declares two apps independent of each other).
+[tool.importlinter]
+root_packages = ["apps"]
+
+[[tool.importlinter.contracts]]
+name = "Apps import only downwards"
+type = "layers"
+containers = ["apps"]
+layers = [
+    "accounts",
+    "core",
+]

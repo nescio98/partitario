@@ -1,0 +1,31 @@
+{% extends "account/base_entrance.html" %}
+{% comment %}
+    allauth's login page; the invitation to sign up only while signup is open
+    (settings.ACCOUNT_SIGNUP_OPEN). The "forgot your password" link is the
+    help text of the password field.
+{% endcomment %}
+{% load i18n allauth account %}
+
+{% block head_title %}{% translate "Log in" %}{% endblock head_title %}
+
+{% block content %}
+    {% url 'account_login' as login_url %}
+    {% element form form=form method="post" action=login_url tags="entrance,login" %}
+        {% slot body %}
+            {% csrf_token %}
+            {% element fields form=form %}
+            {% endelement %}
+            {{ redirect_field }}
+        {% endslot %}
+        {% slot actions %}
+            {% element button type="submit" tags="prominent,login" %}
+                {% translate "Log in" %}
+            {% endelement %}
+        {% endslot %}
+    {% endelement %}
+    {% if signup_open %}
+        {% element p %}
+            {% translate "No account yet?" %} <a href="{{ signup_url }}">{% translate "Sign up" %}</a>
+        {% endelement %}
+    {% endif %}
+{% endblock content %}

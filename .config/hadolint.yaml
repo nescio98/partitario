@@ -1,0 +1,10 @@
+# hadolint configuration (pre-commit hook `hadolint-docker`).
+ignored:
+  # Pinning apt / apk package versions: the base images are pinned to a release
+  # line and rebuilt on every release, and exact package versions disappear
+  # from the distribution mirrors, which would break old builds anyway.
+  - DL3008
+  - DL3018
+  # `COPY --from=docker` is a named build context (additional_contexts in the
+  # compose files, --build-context in CI), not a stage hadolint can see.
+  - DL3022

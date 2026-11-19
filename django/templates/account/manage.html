@@ -1,0 +1,58 @@
+{% extends "account/base_manage.html" %}
+{% comment %}
+    The account page (apps/accounts/views.py::manage): the user's address and
+    the way to allauth's pages that change it, the password and the rest.
+{% endcomment %}
+{% load i18n allauth %}
+
+{% block head_title %}{% translate "Account" %}{% endblock head_title %}
+
+{% block content %}
+    {% element h1 %}{% translate "Account" %}{% endelement %}
+
+    {% element panel %}
+        {% slot title %}{% translate "Email address" %}{% endslot %}
+        {% slot body %}
+            {% element p %}
+                {{ user.email }}
+                {% if email_verified %}
+                    {% element badge tags="success" %}{% translate "Verified" %}{% endelement %}
+                {% else %}
+                    {% element badge tags="warning" %}{% translate "Unverified" %}{% endelement %}
+                {% endif %}
+            {% endelement %}
+        {% endslot %}
+        {% slot actions %}
+            {% url 'account_email' as email_url %}
+            {% element button href=email_url tags="secondary" %}{% translate "Change email address" %}{% endelement %}
+        {% endslot %}
+    {% endelement %}
+
+    {% element panel %}
+        {% slot title %}{% translate "Security" %}{% endslot %}
+        {% slot body %}
+            {% element p %}{% translate "Your password, the second factor asked at login, and the devices you are logged in from." %}{% endelement %}
+        {% endslot %}
+        {% slot actions %}
+            {% url 'account_change_password' as password_url %}
+            {% url 'mfa_index' as mfa_url %}
+            {% url 'usersessions_list' as sessions_url %}
+            {% element button href=password_url tags="secondary" %}{% translate "Change password" %}{% endelement %}
+            {% element button href=mfa_url tags="secondary" %}{% translate "Two-factor authentication" %}{% endelement %}
+            {% element button href=sessions_url tags="secondary" %}{% translate "Sessions" %}{% endelement %}
+        {% endslot %}
+    {% endelement %}
+
+    {% if can_delete %}
+        {% element panel %}
+            {% slot title %}{% translate "Delete account" %}{% endslot %}
+            {% slot body %}
+                {% element p %}{% translate "Removes your account and everything in it, for good." %}{% endelement %}
+            {% endslot %}
+            {% slot actions %}
+                {% url 'account_delete' as delete_url %}
+                {% element button href=delete_url tags="danger" %}{% translate "Delete account" %}{% endelement %}
+            {% endslot %}
+        {% endelement %}
+    {% endif %}
+{% endblock content %}
